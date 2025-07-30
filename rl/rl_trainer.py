@@ -1,72 +1,6 @@
 #!/usr/bin/env python
 """
-Simple Q Language Training Script using TRL's GRPOTrainer
-
-This script demonstrates the simplest possible setup for training Q language models
-using TRL's GRPO trainer with test case-based rewards.
-
-Usage:
-    python simple_q_training.py --model Qwen/Qwen2.5-3B-Instruct
-
-For Weights & Biases logging:
-    pip install wandb
-    wandb login  # (one-time setup)
-    python simple_q_training.py --model Qwen/Qwen2.5-3B-Instruct --use_wandb --wandb_name "my-experiment"
-
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py
-
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0 trl vllm-serve --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol
-
-export CUDA_VISIBLE_DEVICES=0,1,2,4,6,7
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 accelerate launch --num-processes 7 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --use_vllm --output_dir q_language_trl_output_2e-6 --learning_rate 2e-6 --eval_pass_at_k --eval_k 4 --use_lora
-
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4,6,7 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --use_vllm --output_dir q_language_trl_output_low_gens_reasoning  --num_generations 4 --gradient_accumulation_steps 2 --use_reasoning_format
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4,6,7 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --use_vllm --output_dir q_language_trl_output_low_gens_reasoning_lora  --num_generations 4 --gradient_accumulation_steps 2 --use_reasoning_format --use_lora
-
-
-
-## OLD 
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 accelerate launch --num-processes 7 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --use_vllm --output_dir q_language_trl_output_2e-6 --learning_rate 2e-6 --eval_pass_at_k --eval_k 4
-
-
-### NEW
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 accelerate launch --num-processes 7 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --use_vllm --output_dir q_language_simple_eval_2e6 --learning_rate 2e-6 --simple_eval_problems 15 --repeat_eval_problems 4 --eval_steps 25
-
-
-# ZeRO Stage 2 for LoRA compatibility:
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4,6,7 accelerate launch --num-processes 4 --config-file config/zero2.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --output_dir q_language_trl_output_low_gens_reasoning_lora --num_generations 4 --gradient_accumulation_steps 2 --use_reasoning_format --use_lora
-
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /path/to/model --num_generations 4 --gradient_accumulation_steps 2 --use_vllm --output_dir q_language_trl_output_32
-
-# LoRA training examples:
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /path/to/model --use_lora --num_generations 4 --gradient_accumulation_steps 2 --output_dir q_language_trl_lora
-
-# QLoRA training examples:
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /path/to/model --use_qlora --num_generations 4 --gradient_accumulation_steps 2 --output_dir q_language_trl_qlora
-
-
-
-
-## trying smaller mdoel 
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=2,3,4,5,6,7 accelerate launch --num-processes 6 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/sft_baseline_medium_lr_1000/checkpoint-1000 --use_vllm --output_dir q_language_simple_eval_2e6_7b --learning_rate 2e-6 --simple_eval_problems 15 --repeat_eval_problems 4 --eval_steps 25
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1 trl vllm-serve --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/sft_baseline_medium_lr_1000/checkpoint-1000
-
-
-
-### DEFINITELY WORKED
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 accelerate launch --num-processes 7 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --use_vllm --output_dir q_language_simple_eval_2e6 --learning_rate 2e-6 --simple_eval_problems 15 --repeat_eval_problems 4 --eval_steps 25
-
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0 trl vllm-serve --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol
-
-
-
-
+Q Language Training Script using TRL's GRPOTrainer
 
 """
 
@@ -84,12 +18,8 @@ from trl import GRPOConfig, GRPOTrainer
 from peft import LoraConfig
 
 # Optional wandb import
-try:
-    import wandb
-    WANDB_AVAILABLE = True
-except ImportError:
-    WANDB_AVAILABLE = False
-    wandb = None
+import wandb
+WANDB_AVAILABLE = True
 
 # Add parent directory for imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -990,21 +920,3 @@ def main():
 
 if __name__ == "__main__":
     main() 
-
-
-"""
-Working commands here: 
-
-# 1. SIMPLE TRAINING with Repeated Evaluation + Weights & Biases (pass@4-like behavior, vLLM compatible!)
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,6,7 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --simple_eval_problems 20 --repeat_eval_problems 4 --output_dir q_language_simple_eval --learning_rate 3e-6 --num_generations 4 --gradient_accumulation_steps 4 --eval_steps 25 --use_vllm --use_wandb --wandb_name "q-training-vllm-exp1" --wandb_project "q-language-rl" --wandb_tags "vllm" "baseline"
-
-# 2. Without vLLM but with W&B
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,6,7 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --simple_eval_problems 20 --repeat_eval_problems 4 --output_dir q_language_simple_eval --learning_rate 3e-6 --num_generations 4 --gradient_accumulation_steps 4 --eval_steps 25 --use_wandb --wandb_name "q-training-no-vllm-exp1" --wandb_project "q-language-rl"
-
-# 3. LoRA training with W&B
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,4 accelerate launch --num-processes 4 --config-file config/zero2.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --output_dir q_language_lora_exp --num_generations 4 --gradient_accumulation_steps 2 --use_reasoning_format --use_lora --use_wandb --wandb_name "q-training-lora-exp1" --wandb_project "q-language-rl" --wandb_tags "lora" "reasoning"
-
-# 4. Original commands without W&B (for comparison)
-NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=1,2,3,4,6,7 accelerate launch --num-processes 4 --config-file config/zero3.yaml simple_q_training.py --model /mnt/home/brendan/FINALQ/full_stack_q_training/sft_training/outputs/14/best_14_model_100ckpt_2e6l/checkpoint-100/consol --simple_eval_problems 20 --repeat_eval_problems 4 --output_dir q_language_simple_eval --learning_rate 3e-6 --num_generations 4 --gradient_accumulation_steps 4 --eval_steps 25 --use_vllm 
-
-"""

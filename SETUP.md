@@ -1,124 +1,101 @@
-# Setup Guide
+# Setup Guide for Q Language Model Training Pipeline
 
-This guide explains how to set up and configure the Q language model training pipeline.
+This guide will help you set up the Q language model training pipeline on your system.
 
 ## Prerequisites
 
-1. Python 3.8+ with pip
-2. Q interpreter installed and accessible
-3. CUDA-capable GPU (recommended for training)
-4. Access to required APIs (if using external models for dataset building)
+- Python 3.8 or higher
+- CUDA-capable GPU (recommended)
+- Q interpreter installed
+- Git
 
 ## Installation
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd <repository-name>
+   cd fullstack_finetuning_q
    ```
 
-2. Install Python dependencies:
+2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Copy and configure settings:
+3. **Set up configuration**:
    ```bash
    cp config.example.yaml config.yaml
    ```
+
+4. **Edit configuration**:
    Edit `config.yaml` to match your environment.
 
-## Configuration
-
-### Environment Variables
+## Environment Variables
 
 The following environment variables can be set either in your shell or in a `.env` file:
 
 ```bash
-# Q interpreter path (if not in system PATH)
+# Q interpreter path
 Q_INTERPRETER_PATH=/path/to/q/interpreter
 
-# API keys for external services (if using)
+# API keys (optional, for dataset building)
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 XAI_API_KEY=your_xai_key
 GEMINI_API_KEY=your_gemini_key
 ```
 
-### Configuration File
+## Configuration
 
 The `config.yaml` file controls various aspects of the training pipeline:
 
-1. **Dataset Configuration**
-   - `initial_dataset_dir`: Directory for raw dataset
-   - `validated_dataset_dir`: Directory for validated examples
-   - `final_dataset_dir`: Directory for final processed dataset
-   - `q_interpreter_path`: Path to Q interpreter
+```yaml
+dataset:
+  initial_dataset_dir: "initial_dataset"
+  validated_dataset_dir: "validated_dataset"
+  final_dataset_dir: "final_dataset"
+  q_interpreter_path: "q"  # Path to Q interpreter
 
-2. **Model Configuration**
-   - `base_model`: HuggingFace model ID or local path
-   - Training parameters (batch size, learning rate, etc.)
-   - LoRA parameters for efficient fine-tuning
+model:
+  base_model: "Qwen/Qwen2.5-7B-Instruct"
+  max_steps: 1000
+  learning_rate: 2e-5
 
-3. **Output Directories**
-   - `output_dir`: Directory for model checkpoints and outputs
-   - `log_dir`: Directory for training logs
+training:
+  batch_size: 1
+  gradient_accumulation_steps: 8
+  save_every_n_steps: 200
+  eval_steps: 20
+```
 
-## Pipeline Components
+## Quick Start
 
-The codebase is organized into several components:
-
-1. **Dataset Building** (`build_dataset/`)
-   - Processes LeetCode problems
-   - Converts Python solutions to Q
-   - Validates and filters examples
-
-2. **Pretraining** (`pretrain/`)
-   - Pretrains language models on Q code
-   - Supports multiple training methods (LoRA, QLoRA, full)
-
-3. **Supervised Fine-tuning** (`sft/`)
-   - Fine-tunes models on specific tasks
-   - Uses high-quality filtered examples
-
-4. **Reinforcement Learning** (`rl/`)
-   - Further improves model performance
-   - Uses reward modeling for optimization
-
-5. **Evaluation** (`eval/`)
-   - Two-phase evaluation system
-   - Comprehensive metrics collection
-
-## Usage
-
-Each component has its own README with specific instructions. The general workflow is:
-
-1. Build and process the dataset:
+1. **Build Dataset**:
    ```bash
    cd build_dataset
    python process_dataset.py
    python convert_to_q.py
    ```
 
-2. Run pretraining (if needed):
+2. **Pretrain Model**:
    ```bash
    cd pretrain
    python run_pretraining.py
    ```
 
-3. Run supervised fine-tuning:
+3. **Supervised Fine-tuning**:
    ```bash
    cd sft
    python run_sft.py
    ```
 
-4. Run RL training (optional):
+4. **Reinforcement Learning**:
    ```bash
    cd rl
-   python run_rl.py
+   python rl_trainer.py
    ```
 
-5. Evaluate the model:
+5. **Evaluate Model**:
    ```bash
    cd eval
    python run_full_evaluation.py
@@ -126,17 +103,20 @@ Each component has its own README with specific instructions. The general workfl
 
 ## Troubleshooting
 
-1. **Q Interpreter Not Found**
-   - Ensure Q is installed and in PATH
+### Common Issues
+
+1. **Q Interpreter Not Found**:
    - Set Q_INTERPRETER_PATH in .env or config.yaml
+   - Ensure Q is properly installed and accessible
 
-2. **GPU Memory Issues**
-   - Adjust batch_size and gradient_accumulation_steps
-   - Use LoRA/QLoRA instead of full fine-tuning
+2. **CUDA Out of Memory**:
+   - Reduce batch size in config.yaml
+   - Use gradient accumulation
+   - Enable gradient checkpointing
 
-3. **API Rate Limits**
-   - Adjust processing delays in dataset building
-   - Use local models where possible
+3. **API Key Issues**:
+   - Verify API keys are set correctly
+   - Check rate limits for API services
 
 ## Contributing
 

@@ -1,24 +1,19 @@
 # Pretraining Pipeline
 
-This component handles the pretraining of language models on Q programming language code, supporting multiple training methods and configurations.
+This component handles the pretraining of language models on Q programming language code using the kdb+ license dataset.
 
 ## Overview
 
-The pretraining pipeline offers flexible training approaches:
+The pretraining pipeline supports full fine-tuning on a curated dataset of approximately 1.6M tokens of Q programming language code.
 
-1. **Training Methods**
-   - Full fine-tuning
-   - LoRA (Low-Rank Adaptation)
-   - QLoRA (Quantized LoRA)
+## Data Setup
 
-2. **Data Types**
-   - Raw code
-   - Filtered examples
-   - Described/documented code
+1. **Download the Dataset**:
+   ```bash
+   python download_ds.py --repo-name kdb-license-dataset --output-dir kdb_license_processed
+   ```
 
-3. **Model Support**
-   - Qwen models (recommended)
-   - Other HuggingFace models
+   This will download the dataset and save it as JSONL files in the `kdb_license_processed/` directory.
 
 ## Directory Structure
 
@@ -27,67 +22,78 @@ pretrain/
 ├── run_pretraining.py    # Main training script
 ├── train_pretrain.py     # Core training logic
 ├── pretrain_exps.sh      # Example experiment scripts
-└── output/
-    └── [model_name]/     # Training outputs
-        ├── checkpoints/  # Model checkpoints
-        ├── logs/        # Training logs
-        └── results/     # Evaluation results
+├── download_ds.py        # Dataset download script
+└── final_outputs/        # Training outputs
+    ├── 1.5b/            # 1.5B model outputs
+    ├── 3b/              # 3B model outputs
+    ├── 7b/              # 7B model outputs
+    ├── 14b/             # 14B model outputs
+    └── 32b/             # 32B model outputs
 ```
 
-## Usage
+## Training Examples
 
-1. **Basic Training**:
-   ```bash
-   python run_pretraining.py \
-       --model_name Qwen/Qwen2.5-7B-Instruct \
-       --data_type filtered \
-       --training_method lora \
-       --max_steps 500
-   ```
+The `pretrain_exps.sh` script contains examples for training all 5 model sizes:
 
-2. **Training Methods**:
-   ```bash
-   # LoRA training
-   python run_pretraining.py --training_method lora
-   
-   # QLoRA training
-   python run_pretraining.py --training_method qlora
-   
-   # Full fine-tuning
-   python run_pretraining.py --training_method full
-   ```
+### Small Models (1.5B, 3B, 7B)
+```bash
+python run_pretraining.py \
+  --model_name Qwen/Qwen2.5-1.5B-Instruct \
+  --data_type licensed \
+  --training_method full \
+  --max_steps 800 \
+  --save_steps 100 \
+  --learning_rate 1e-5 \
+  --output_dir final_outputs/1.5b \
+  --wandb
+```
 
-3. **Data Types**:
-   ```bash
-   # Raw dataset
-   python run_pretraining.py --data_type raw
-   
-   # Filtered dataset
-   python run_pretraining.py --data_type filtered
-   
-   # Described/documented dataset
-   python run_pretraining.py --data_type described_filtered
-   ```
+### Large Models (14B, 32B)
+```bash
+accelerate launch --num_processes=4 train_pretrain.py \
+  --model_name_or_path Qwen/Qwen2.5-14B-Instruct \
+  --train_file kdb_license_processed/train_license_kdbsite.jsonl \
+  --eval_file kdb_license_processed/eval_license_kdbsite.jsonl \
+  --max_steps 800 \
+  --save_steps 80 \
+  --learning_rate 1e-5 \
+  --per_device_train_batch_size 1 \
+  --gradient_accumulation_steps 8 \
+  --output_dir final_outputs/14b \
+  --report_to wandb \
+  --wandb_project q-pretraining
+```
+
+## Model Sizes Supported
+
+1. **1.5B Model**: `Qwen/Qwen2.5-1.5B-Instruct`
+2. **3B Model**: `Qwen/Qwen2.5-3B-Instruct`
+3. **7B Model**: `Qwen/Qwen2.5-7B-Instruct`
+4. **14B Model**: `Qwen/Qwen2.5-14B-Instruct` (requires multi-GPU)
+5. **32B Model**: `Qwen/Qwen2.5-32B-Instruct` (requires multi-GPU)
+
+## Next Steps: SFT and RL Training
+
+After pretraining, you can use the best checkpoints for supervised fine-tuning (SFT) and reinforcement learning (RL). Update the model paths in the SFT and RL scripts:
+
+- **SFT Script**: Update `${MODEL_DIR}/pretrain/final_outputs/[model_size]/checkpoint-[step]` with your best pretrained checkpoint
+- **RL Script**: Update `${MODEL_DIR}/sft/final_outputs/[model_size]/checkpoint-[step]` with your best SFT checkpoint
 
 ## Configuration
 
-Key configuration options in `config.yaml`:
+Key training parameters:
 
 ```yaml
-model:
-  base_model: "Qwen/Qwen2.5-7B-Instruct"
-  max_seq_length: 2048
-  learning_rate: 2.0e-5
-  batch_size: 1
-  gradient_accumulation_steps: 8
-  warmup_steps: 100
-  max_steps: 1000
-  save_steps: 50
-  
-  # LoRA settings
-  lora_rank: 16
-  lora_alpha: 32
-  lora_dropout: 0.1
+# Common settings for all models
+max_steps: 800
+learning_rate: 1e-5
+save_steps: 100
+training_method: full
+
+# Large model settings (14B, 32B)
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+num_processes: 4
 ```
 
 ## Training Parameters
@@ -99,16 +105,11 @@ Important training parameters:
    - `--max_seq_length`: Maximum sequence length
 
 2. **Training Settings**
-   - `--learning_rate`: Learning rate
+   - `--learning_rate`: Learning rate (1e-5 recommended)
    - `--batch_size`: Batch size per GPU
    - `--gradient_accumulation_steps`: Steps for gradient accumulation
-   - `--max_steps`: Total training steps
+   - `--max_steps`: Total training steps (800 recommended)
    - `--save_steps`: Checkpoint frequency
-
-3. **LoRA Parameters**
-   - `--lora_rank`: LoRA rank
-   - `--lora_alpha`: LoRA alpha
-   - `--lora_dropout`: LoRA dropout rate
 
 ## Experiment Tracking
 
@@ -117,8 +118,7 @@ The pipeline integrates with Weights & Biases:
 ```bash
 python run_pretraining.py \
     --wandb \
-    --wandb_project q-pretraining \
-    --experiment_name my_experiment
+    --wandb_project q-pretraining
 ```
 
 ## Output Structure
@@ -126,7 +126,7 @@ python run_pretraining.py \
 Training produces:
 
 ```
-output/[model_name]/
+final_outputs/[model_size]/
 ├── checkpoints/
 │   ├── checkpoint-100/   # Checkpoint at step 100
 │   ├── checkpoint-200/   # Checkpoint at step 200
@@ -149,9 +149,9 @@ Tips for managing memory usage:
    - Adjust `batch_size`
    - Use `gradient_accumulation_steps`
 
-3. **LoRA vs Full Fine-tuning**
-   - LoRA for memory efficiency
-   - QLoRA for extreme efficiency
+3. **Multi-GPU Training**
+   - Use `accelerate launch` for 14B and 32B models
+   - Configure appropriate number of processes
 
 ## Troubleshooting
 
@@ -160,8 +160,7 @@ Common issues and solutions:
 1. **Out of Memory**
    - Reduce batch size
    - Increase gradient accumulation
-   - Switch to LoRA/QLoRA
-   - Enable gradient checkpointing
+   - Use appropriate number of GPUs for large models
 
 2. **Training Instability**
    - Adjust learning rate

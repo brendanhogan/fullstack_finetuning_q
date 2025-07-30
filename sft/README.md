@@ -7,7 +7,7 @@ This component handles supervised fine-tuning of language models on high-quality
 The SFT pipeline fine-tunes pretrained models using:
 - High-quality filtered examples
 - Instruction-following format
-- Multiple training approaches
+- Full fine-tuning approach
 
 ## Directory Structure
 
@@ -16,63 +16,72 @@ sft/
 ├── run_sft.py           # Main training script
 ├── train_sft.py         # Core training logic
 ├── run_sft_exps.sh      # Example experiments
-└── output/
-    └── [model_name]/    # Training outputs
-        ├── checkpoints/ # Model checkpoints
-        ├── logs/       # Training logs
-        └── results/    # Evaluation results
+└── final_outputs/       # Training outputs
+    ├── 1.5b/           # 1.5B model outputs
+    ├── 3b/             # 3B model outputs
+    ├── 7b/             # 7B model outputs
+    ├── 14b/            # 14B model outputs
+    └── 32b/            # 32B model outputs
 ```
 
-## Usage
+## Training Examples
 
-1. **Basic Training**:
-   ```bash
-   python run_sft.py \
-       --base_model /path/to/pretrained \
-       --learning_rate 2e-5 \
-       --max_steps 1000 \
-       --output_dir outputs/sft_run
-   ```
+The `run_sft_exps.sh` script contains examples for training all 5 model sizes:
 
-2. **Training Methods**:
-   ```bash
-   # LoRA training
-   python run_sft.py --use_lora
+### Small Models (1.5B, 3B, 7B)
+```bash
+python run_sft.py \
+  --base_model ${MODEL_DIR}/pretrain/final_outputs/1.5b/checkpoint-800 \
+  --learning_rate 2e-5 \
+  --max_steps 1000 \
+  --output_dir final_outputs/1.5b/ \
+  --experiment_name q-sft
+```
 
-   # QLoRA training
-   python run_sft.py --use_qlora
+### Large Models (14B, 32B)
+```bash
+accelerate launch --num_processes=4 --main_process_port=29501 run_sft.py \
+  --base_model ${MODEL_DIR}/pretrain/final_outputs/14b/checkpoint-50/consolidated/ \
+  --learning_rate 4e-6 \
+  --max_steps 1000 \
+  --output_dir final_outputs/14b/ \
+  --experiment_name q-sft \
+  --save_every_n_steps 50
+```
 
-   # Full fine-tuning
-   python run_sft.py  # No adaptation flags
-   ```
+## Model Paths
+
+**Important**: Update the model paths in `run_sft_exps.sh` with your best pretrained checkpoints:
+
+- **Small Models**: `${MODEL_DIR}/pretrain/final_outputs/[model_size]/checkpoint-[step]`
+- **Large Models**: `${MODEL_DIR}/pretrain/final_outputs/[model_size]/checkpoint-[step]/consolidated/`
+
+Replace `[model_size]` and `[step]` with your actual best checkpoint paths.
+
+## Model Sizes Supported
+
+1. **1.5B Model**: Uses checkpoint-800 from pretraining
+2. **3B Model**: Uses checkpoint-800 from pretraining  
+3. **7B Model**: Uses checkpoint-200 from pretraining
+4. **14B Model**: Uses checkpoint-50/consolidated from pretraining (requires multi-GPU)
+5. **32B Model**: Uses checkpoint-50/consolidated from pretraining (requires multi-GPU)
 
 ## Configuration
 
-Key configuration options in `config.yaml`:
+Key training parameters:
 
 ```yaml
-model:
-  # Training parameters
-  learning_rate: 2.0e-5
-  batch_size: 1
-  gradient_accumulation_steps: 8
-  warmup_steps: 100
-  max_steps: 1000
-  save_steps: 50
-  
-  # LoRA parameters (if using)
-  lora_rank: 16
-  lora_alpha: 32
-  lora_dropout: 0.1
+# Common settings for all models
+max_steps: 1000
+learning_rate: 2e-5 (small models), 4e-6 (large models)
+save_steps: 100
+training_method: full
+
+# Large model settings (14B, 32B)
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+num_processes: 4
 ```
-
-## Training Data
-
-The SFT process uses:
-1. Filtered, high-quality examples
-2. Instruction-following format
-3. Test case validation
-4. Code quality metrics
 
 ## Training Parameters
 
@@ -84,29 +93,26 @@ Important parameters:
    - `--bf16`: Mixed precision training
 
 2. **Training Settings**
-   - `--learning_rate`: Learning rate
+   - `--learning_rate`: Learning rate (2e-5 for small models, 4e-6 for large models)
    - `--batch_size`: Batch size per GPU
    - `--gradient_accumulation_steps`: Gradient accumulation
-   - `--max_steps`: Total steps
+   - `--max_steps`: Total steps (1000 recommended)
    - `--save_steps`: Checkpoint frequency
 
-3. **Adaptation Settings**
-   - `--use_lora`: Enable LoRA
-   - `--use_qlora`: Enable QLoRA
-   - `--lora_rank`: LoRA rank
-   - `--lora_alpha`: LoRA alpha
-   - `--lora_dropout`: LoRA dropout
+## Next Steps: RL Training
+
+After SFT, you can use the best checkpoints for reinforcement learning (RL). Update the model paths in the RL script:
+
+- **RL Script**: Update `${MODEL_DIR}/sft/final_outputs/[model_size]/checkpoint-[step]` with your best SFT checkpoint
 
 ## Experiment Tracking
 
-Weights & Biases integration:
+The pipeline integrates with Weights & Biases:
 
 ```bash
 python run_sft.py \
-    --base_model /path/to/model \
-    --wandb \
-    --wandb_project q-sft \
-    --experiment_name my_experiment
+    --experiment_name q-sft \
+    --wandb
 ```
 
 ## Output Structure
@@ -114,20 +120,20 @@ python run_sft.py \
 Training produces:
 
 ```
-output/[model_name]/
+final_outputs/[model_size]/
 ├── checkpoints/
-│   ├── checkpoint-100/  # Checkpoint at step 100
-│   ├── checkpoint-200/  # Checkpoint at step 200
+│   ├── checkpoint-100/   # Checkpoint at step 100
+│   ├── checkpoint-200/   # Checkpoint at step 200
 │   └── ...
 ├── logs/
-│   ├── training_log.txt # Training progress
+│   ├── training_log.txt  # Training progress
 │   └── eval_results.json # Evaluation metrics
-└── config.yaml         # Training configuration
+└── config.yaml          # Training configuration
 ```
 
 ## Memory Optimization
 
-Tips for managing memory:
+Tips for managing memory usage:
 
 1. **Gradient Checkpointing**
    - Enabled by default
@@ -137,13 +143,9 @@ Tips for managing memory:
    - Adjust `batch_size`
    - Use `gradient_accumulation_steps`
 
-3. **Mixed Precision**
-   - Use `--bf16` for mixed precision
-   - Reduces memory usage
-
-4. **Model Parallelism**
-   - Use `accelerate` for multi-GPU
-   - Shard model across devices
+3. **Multi-GPU Training**
+   - Use `accelerate launch` for 14B and 32B models
+   - Configure appropriate number of processes
 
 ## Troubleshooting
 
@@ -152,24 +154,22 @@ Common issues and solutions:
 1. **Out of Memory**
    - Reduce batch size
    - Increase gradient accumulation
-   - Enable mixed precision
-   - Use LoRA/QLoRA
+   - Use appropriate number of GPUs for large models
 
 2. **Training Instability**
    - Adjust learning rate
    - Modify warmup steps
    - Check gradient clipping
-   - Monitor loss curves
 
 3. **Slow Training**
+   - Optimize sequence length
+   - Use appropriate batch size
    - Check GPU utilization
-   - Optimize batch size
-   - Use appropriate precision
 
 ## Contributing
 
 When adding features:
 1. Update training scripts
-2. Add configuration options
+2. Add new configuration options
 3. Document parameters
 4. Include example usage 
