@@ -1,5 +1,19 @@
 # Q Language Model Training Pipeline
 
+> **Technical Report Implementation**: This repository contains the complete implementation for our technical report on adapting large language models to the Q programming language. Our work addresses the challenge of training LLMs for specialized programming languages that are under-represented on the Internet.
+
+> **📄 [Technical Report: Full-Stack Fine-Tuning for the Q Programming Language](LINK_TO_PAPER_PLACEHOLDER)** *(Coming Soon)*
+
+## About This Work
+
+This repository implements our research on adapting large language models to the Q programming language, a specialized tool used in quantitative finance. While general-purpose LLMs excel at mainstream languages like Python and Java, they struggle with niche programming languages that are poorly represented in their training data.
+
+Our approach demonstrates how to effectively train LLMs for specialized domains through a complete pipeline: dataset construction, pretraining, supervised fine-tuning, and reinforcement learning. We train models across five parameter sizes (1.5B to 32B) and achieve significant improvements over frontier models like GPT-4.1 and Claude Opus-4 on our Q programming benchmark.
+
+This work provides a blueprint for adapting LLMs to other specialized domains where evaluation relies on objective signals (like code execution) rather than subjective human judgment.
+
+---
+
 A comprehensive pipeline for training large language models on the Q programming language, from dataset creation to evaluation, including iterative bootstrap improvement.
 
 ## Overview
