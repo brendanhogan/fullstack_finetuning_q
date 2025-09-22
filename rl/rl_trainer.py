@@ -11,6 +11,10 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 import torch
 from datasets import Dataset
@@ -24,9 +28,9 @@ WANDB_AVAILABLE = True
 # Add parent directory for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import existing utilities
+# Import RL training utilities
 from rl_training.rl_datasets import get_q_code_dataloaders
-from rl_training.rl_evaluator import RLEvaluator
+from rl_training.rl_evaluator import RLEvaluator, run_q_code
 from rl_training.rl_utils import extract_q_code_with_reasoning_support
 
 # Configure logging
@@ -201,7 +205,6 @@ def create_q_reward_function(train_dataset: Dataset, eval_dataset: Dataset = Non
                         continue
                     
                     # Run the test with increased timeout
-                    from rl_training.rl_evaluator import run_q_code
                     
                     # Remove exit 0; from solution if present
                     clean_q_code = q_code.strip()
@@ -381,7 +384,6 @@ def create_pass_at_k_evaluator(eval_dataset: Dataset, use_reasoning_format: bool
                             if not test_code:
                                 continue
                             
-                            from rl_training.rl_evaluator import run_q_code
                             
                             clean_q_code = q_code.strip()
                             if clean_q_code.endswith("exit 0;"):
@@ -729,12 +731,11 @@ def main():
     # Load datasets
     logger.info("Loading Q language datasets...")
     train_loader, test_loader = get_q_code_dataloaders(
+        sft_data_dir=os.environ.get("SFT_DATA_DIR"),
         max_train_problems=args.max_train_problems,
         max_test_problems=args.max_test_problems,
         seed=args.seed
     )
-    print("here12367")
-    
     # Convert to list of problems
     train_problems = []
     for batch in train_loader:
@@ -746,14 +747,12 @@ def main():
             })
         else:
             train_problems.append(batch)
-    print("here123245")
     
     # Get test problems directly from the QCodeDataLoader
     test_problems = test_loader.problems
     
     logger.info(f"Loaded {len(train_problems)} training problems")
     logger.info(f"Loaded {len(test_problems)} test problems")
-    print("here1234")
     
     # Prepare datasets for TRL
     logger.info("Preparing datasets for TRL...")
